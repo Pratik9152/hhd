@@ -2,14 +2,15 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-import io
+import os
+
+# ✅ SET PAGE CONFIG FIRST
+st.set_page_config(page_title="Gratuity Tracker", layout="wide")
 
 # --- Dummy login system ---
 users = {"admin": "password123", "hr": "hr2024"}
 
 def login():
-    st.set_page_config(page_title="Gratuity Tracker", layout="wide")
-
     st.sidebar.title("🔐 Login")
     username = st.sidebar.text_input("Username")
     password = st.sidebar.text_input("Password", type="password")
@@ -25,9 +26,8 @@ if not login():
     st.stop()
 
 # --- App Interface ---
-
 st.title("🏢 Employee Gratuity Tracker (5+ Years Eligibility)")
-st.markdown("Upload your latest employee Excel file below. The app auto-checks gratuity eligibility and generates insights.")
+st.markdown("Upload or view the latest employee Excel file. The app auto-checks gratuity eligibility and generates live insights.")
 
 uploaded_file = st.file_uploader("📤 Upload Employee Excel File", type=["xlsx"])
 
@@ -36,50 +36,57 @@ def calculate_years(joining_date, exit_date=None):
     end_date = exit_date if pd.notna(exit_date) else today
     return round((end_date - joining_date).days / 365, 2)
 
+# --- File Save Path ---
+save_path = "saved_data.xlsx"
+
+# If new file uploaded, overwrite saved_data.xlsx
 if uploaded_file:
     df = pd.read_excel(uploaded_file, parse_dates=["Joining Date", "Exit Date"])
     df["Completed Years"] = df.apply(lambda row: calculate_years(row["Joining Date"], row["Exit Date"]), axis=1)
     df["Status"] = df["Exit Date"].apply(lambda x: "Exited" if pd.notna(x) and x < datetime.today() else "Working")
     df["Gratuity Eligible"] = df["Completed Years"] >= 5
-
-    st.subheader("📊 Live Dashboard")
-    st.dataframe(df.style.applymap(lambda x: "background-color: #d1e7dd" if x is True else "", subset=["Gratuity Eligible"]))
-
-    eligible_df = df[df["Gratuity Eligible"] & (df["Status"] == "Working")]
-    
-    # --- Animated Chart ---
-    st.subheader("📈 Gratuity Eligibility Overview")
-    chart_data = df["Gratuity Eligible"].value_counts().rename(index={True: "Eligible", False: "Not Eligible"})
-    fig = px.pie(names=chart_data.index, values=chart_data.values, title="Eligibility Distribution", hole=0.4)
-    st.plotly_chart(fig, use_container_width=True)
-
-    # --- Download Button ---
-    st.download_button("⬇️ Download Eligible Report", data=eligible_df.to_csv(index=False), file_name="eligible_gratuity_employees.csv", mime="text/csv")
-
-    # --- Simulated Email Sender ---
-    st.subheader("📧 Send Report via Email")
-    with st.form("email_form"):
-        email_to = st.text_input("Recipient Email")
-        email_body = st.text_area("Email Message", value="Hi, please find attached the gratuity eligibility report.")
-        submitted = st.form_submit_button("Send Email")
-        if submitted:
-            if email_to:
-                st.success(f"✅ Email sent successfully to {email_to} (simulated).")
-            else:
-                st.error("❌ Please enter a valid email address.")
-
+    df.to_excel(save_path, index=False)  # Save for future users
+    st.success("✅ Data uploaded and saved!")
+elif os.path.exists(save_path):
+    df = pd.read_excel(save_path, parse_dates=["Joining Date", "Exit Date"])
+    df["Completed Years"] = df.apply(lambda row: calculate_years(row["Joining Date"], row["Exit Date"]), axis=1)
+    df["Status"] = df["Exit Date"].apply(lambda x: "Exited" if pd.notna(x) and x < datetime.today() else "Working")
+    df["Gratuity Eligible"] = df["Completed Years"] >= 5
+    st.info("Loaded previously uploaded employee data.")
 else:
-    st.warning("Please upload a valid Excel file. Sample format below.")
+    st.warning("No uploaded file yet. Please upload Excel file.")
+    st.stop()
 
-    sample_df = pd.DataFrame({
-        "Emp ID": [1001, 1002],
-        "Name": ["Rahul Shah", "Priya Mehta"],
-        "Department": ["HR", "Finance"],
-        "Joining Date": ["2018-01-10", "2016-06-22"],
-        "Exit Date": ["", "2023-12-31"]
-    })
-    st.dataframe(sample_df)
+# --- Main Dashboard Display ---
+st.subheader("📋 Employee Gratuity Table")
+st.dataframe(df.style.applymap(lambda x: "background-color: #d1e7dd" if x is True else "", subset=["Gratuity Eligible"]))
 
-    sample_file = io.BytesIO()
-    sample_df.to_excel(sample_file, index=False)
-    st.download_button("📥 Download Sample Excel Format", data=sample_file.getvalue(), file_name="sample_employee_data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+eligible_df = df[df["Gratuity Eligible"] & (df["Status"] == "Working")]
+
+# --- Animated Pie Chart ---
+st.subheader("📈 Gratuity Eligibility Overview")
+chart_data = df["Gratuity Eligible"].value_counts().rename(index={True: "Eligible", False: "Not Eligible"})
+fig_pie = px.pie(names=chart_data.index, values=chart_data.values, title="Eligibility Distribution", hole=0.4)
+st.plotly_chart(fig_pie, use_container_width=True)
+
+# --- Bar Chart by Department ---
+st.subheader("🏬 Eligible Employees by Department")
+dept_data = eligible_df["Department"].value_counts().reset_index()
+dept_data.columns = ["Department", "Eligible Count"]
+fig_bar = px.bar(dept_data, x="Department", y="Eligible Count", color="Department", title="Eligible Employees by Department")
+st.plotly_chart(fig_bar, use_container_width=True)
+
+# --- Download Button ---
+st.download_button("⬇️ Download Eligible Report", data=eligible_df.to_csv(index=False), file_name="eligible_gratuity_employees.csv", mime="text/csv")
+
+# --- Simulated Email Sender ---
+st.subheader("📧 Send Report via Email")
+with st.form("email_form"):
+    email_to = st.text_input("Recipient Email")
+    email_body = st.text_area("Email Message", value="Hi, please find attached the gratuity eligibility report.")
+    submitted = st.form_submit_button("Send Email")
+    if submitted:
+        if email_to:
+            st.success(f"✅ Email sent successfully to {email_to} (simulated).")
+        else:
+            st.error("❌ Please enter a valid email address.")
