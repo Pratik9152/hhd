@@ -9,27 +9,34 @@ from streamlit_lottie import st_lottie
 # Page setup
 st.set_page_config(page_title="Gratuity Tracker", layout="wide")
 
-# Animated Background CSS
+# 🎨 Animated Background CSS (Final Fix)
 st.markdown("""
     <style>
-    html, body, [data-testid="stAppViewContainer"] {
-        background: linear-gradient(270deg, #ff9a9e, #fad0c4, #fad0c4, #ffdde1) !important;
-        background-size: 800% 800% !important;
-        animation: gradient 30s ease infinite !important;
-        height: 100%;
+    [data-testid="stAppViewContainer"] {
+        background: linear-gradient(-45deg, #ff9a9e, #fad0c4, #ffdde1, #a18cd1);
+        background-size: 400% 400%;
+        animation: gradient 15s ease infinite;
     }
     @keyframes gradient {
         0% {background-position: 0% 50%;}
         50% {background-position: 100% 50%;}
         100% {background-position: 0% 50%;}
     }
-    [data-testid="stAppViewContainer"] > .main {
-        background-color: rgba(255, 255, 255, 0.0) !important;
+    [data-testid="stHeader"] {
+        background-color: rgba(255, 255, 255, 0);
+    }
+    [data-testid="stSidebar"] {
+        background: rgba(255, 255, 255, 0.7);
+    }
+    .main {
+        background-color: rgba(255, 255, 255, 0.3);
+        padding: 1rem;
+        border-radius: 1rem;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Load Lottie animation
+# 🌟 Load Lottie Animation
 def load_lottie_url(url):
     try:
         r = requests.get(url)
@@ -41,7 +48,7 @@ def load_lottie_url(url):
 
 lottie_employee = load_lottie_url("https://assets6.lottiefiles.com/packages/lf20_w51pcehl.json")
 
-# Login System
+# 🔐 Login
 users = {"admin": "password123", "hr": "hr2024"}
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -60,21 +67,22 @@ if not st.session_state["logged_in"]:
             st.error("❌ Invalid username or password")
     st.stop()
 
-# Header and Lottie animation
+# 🏢 Header & Animation
 st.title("🎉 Gratuity Tracker Dashboard")
 if lottie_employee:
     st_lottie(lottie_employee, height=250, key="emp_lottie")
 else:
     st.warning("⚠️ Animation failed to load.")
 
+# 📂 Save Path
 save_path = "saved_data.xlsx"
 
-# Calculate years of service
+# 🔢 Year Calculation
 def calculate_years(joining, exit=None):
     end = exit if pd.notna(exit) else datetime.today()
     return round((end - joining).days / 365, 2)
 
-# Update or merge data
+# 🔁 Update Data
 def update_data(existing, new):
     new["Emp ID"] = new["Emp ID"].astype(str)
     existing["Emp ID"] = existing["Emp ID"].astype(str)
@@ -85,7 +93,7 @@ def update_data(existing, new):
     merged.reset_index(inplace=True)
     return merged
 
-# Upload employee Excel file
+# 📤 Upload
 uploaded = st.file_uploader("📤 Upload Employee Excel", type=["xlsx"])
 if uploaded:
     new_df = pd.read_excel(uploaded, parse_dates=["Joining Date", "Exit Date"])
@@ -105,14 +113,14 @@ else:
     st.warning("⚠️ Please upload an Excel file.")
     st.stop()
 
-# Summary Metrics
+# 📊 Summary
 st.markdown("### 📊 Overview")
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Employees", len(df))
 col2.metric("Gratuity Eligible", len(df[df["Gratuity Eligible"]]))
 col3.metric("Currently Working", len(df[df["Status"] == "Working"]))
 
-# Filters
+# 🔍 Filters
 st.sidebar.header("🔍 Filter")
 depts = st.sidebar.multiselect("Department", df["Department"].unique(), default=df["Department"].unique())
 eligible_only = st.sidebar.checkbox("Only Gratuity Eligible", True)
@@ -127,11 +135,11 @@ filtered = df[
 if eligible_only:
     filtered = filtered[(filtered["Gratuity Eligible"]) | (filtered["Status"] == "Working")]
 
-# Table Display
+# 📋 Table
 st.subheader("📋 Filtered Employee Table")
 st.dataframe(filtered)
 
-# Charts
+# 📈 Charts
 if not filtered.empty:
     st.subheader("📈 Gratuity Eligibility")
     pie_data = filtered["Gratuity Eligible"].value_counts().rename(index={True: "Eligible", False: "Not Eligible"})
@@ -146,5 +154,5 @@ if not filtered.empty:
 else:
     st.info("Try adjusting filters to show data.")
 
-# Download Button
+# 📥 Download Button
 st.download_button("⬇️ Download Filtered Report", data=filtered.to_csv(index=False), file_name="filtered_gratuity_report.csv", mime="text/csv")
