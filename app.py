@@ -23,7 +23,7 @@ if not login():
     st.stop()
 
 # --- App Interface ---
-st.set_page_config(page_title="Gratuity Tracker", layout="wide")
+
 st.title("🏢 Employee Gratuity Tracker (5+ Years Eligibility)")
 st.markdown("Upload your latest employee Excel file below. The app auto-checks gratuity eligibility and generates insights.")
 
