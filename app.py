@@ -4,7 +4,48 @@ import plotly.express as px
 from datetime import datetime
 import os
 
+# Set Streamlit page config
 st.set_page_config(page_title="Gratuity Tracker", layout="wide")
+
+# Custom animated CSS background and styles
+st.markdown("""
+    <style>
+    body {
+        background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+        background-size: 400% 400%;
+        animation: gradientBG 15s ease infinite;
+        color: white;
+    }
+    @keyframes gradientBG {
+        0% {background-position: 0% 50%;}
+        50% {background-position: 100% 50%;}
+        100% {background-position: 0% 50%;}
+    }
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+    .stButton>button {
+        background-color: #6a11cb;
+        color: white;
+        font-weight: bold;
+        border-radius: 10px;
+        padding: 10px 20px;
+    }
+    .stDownloadButton>button {
+        background-color: #11998e;
+        color: white;
+        font-weight: bold;
+        border-radius: 10px;
+    }
+    .stTextInput>div>div>input {
+        background-color: #f0f0f0;
+        color: black;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # --- Login System ---
 users = {"admin": "password123", "hr": "hr2024"}
@@ -13,28 +54,10 @@ if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
 if not st.session_state["logged_in"]:
-    st.markdown("""
-        <style>
-        body {
-            background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
-        }
-        .login-container {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 80vh;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("<div class='login-container'>", unsafe_allow_html=True)
     st.title("🔐 Login to Gratuity Tracker")
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     login_btn = st.button("Login")
-    st.markdown("</div>", unsafe_allow_html=True)
-
     if login_btn:
         if username in users and users[username] == password:
             st.session_state["logged_in"] = True
@@ -43,14 +66,9 @@ if not st.session_state["logged_in"]:
             st.error("Invalid username or password")
     st.stop()
 
-# --- Main Interface ---
-st.markdown(
-    "<style>body {background: linear-gradient(to right, #e0c3fc, #8ec5fc);}</style>",
-    unsafe_allow_html=True
-)
-
+# --- Dashboard Start ---
 st.title("🎉 Gratuity Tracker Dashboard")
-st.markdown("Upload your Excel file to update employee data. This app will track and store history automatically.")
+st.markdown("Upload your Excel file to update employee data. The system will store history and update records smartly.")
 
 save_path = "saved_data.xlsx"
 
@@ -92,10 +110,10 @@ else:
         st.warning("Please upload an Excel file.")
         st.stop()
 
-# --- Filtering Section ---
-st.sidebar.header("🔍 Filter Data")
+# --- Filter Sidebar ---
+st.sidebar.header("🔍 Filter")
 dept_options = st.sidebar.multiselect("Select Department", options=df["Department"].unique(), default=df["Department"].unique())
-eligible_only = st.sidebar.checkbox("Show only Gratuity Eligible", value=True)
+eligible_only = st.sidebar.checkbox("Show Gratuity Eligible Only", value=True)
 start_date = st.sidebar.date_input("Joining Date From", value=datetime(2015, 1, 1))
 end_date = st.sidebar.date_input("Joining Date To", value=datetime.today())
 
@@ -108,12 +126,12 @@ filtered_df = df[
 if eligible_only:
     filtered_df = filtered_df[(filtered_df["Gratuity Eligible"]) | (filtered_df["Status"] == "Working")]
 
-# --- Table Display ---
+# --- Display Table ---
 st.subheader("📋 Filtered Employee Table")
 st.dataframe(filtered_df)
 
 # --- Charts ---
-st.subheader("📈 Gratuity Status Distribution")
+st.subheader("📈 Eligibility Overview")
 pie_data = filtered_df["Gratuity Eligible"].value_counts().rename(index={True: "Eligible", False: "Not Eligible"})
 fig_pie = px.pie(names=pie_data.index, values=pie_data.values, title="Gratuity Eligibility")
 st.plotly_chart(fig_pie, use_container_width=True)
@@ -126,6 +144,5 @@ st.plotly_chart(fig_bar, use_container_width=True)
 
 # --- Download Button ---
 st.download_button("⬇️ Download Filtered Report", data=filtered_df.to_csv(index=False), file_name="filtered_gratuity_report.csv", mime="text/csv")
-
 
    
