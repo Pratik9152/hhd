@@ -1,4 +1,4 @@
-# Gratuity Tracker with Email Sending - Final Streamlit App
+# Gratuity Tracker with Email Sending - Streamlit App (With Animated Dashboard + Secure Email)
 
 import streamlit as st
 import pandas as pd
@@ -9,6 +9,10 @@ import requests
 import smtplib
 from email.message import EmailMessage
 from streamlit_lottie import st_lottie
+from dotenv import load_dotenv
+
+# Load environment variables for secure email
+load_dotenv()
 
 # Page setup
 st.set_page_config(page_title="Gratuity Tracker", layout="wide")
@@ -92,10 +96,10 @@ def update_data(existing, new):
     merged.reset_index(inplace=True)
     return merged
 
-# Send Email Function
+# Send Email Function (secure)
 def send_email_easy(to_email, subject, body, attachment_path=None):
-    sender_email = "Pratiktekawade5555@gmail.com"  # Replace with your Gmail
-    app_password = "pratik9090"  # Replace with Gmail App Password
+    sender_email = os.getenv("GMAIL_USER")
+    app_password = os.getenv("GMAIL_PASS")
 
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -163,6 +167,13 @@ if eligible_only:
 st.subheader("📋 Filtered Employee Table")
 st.dataframe(filtered)
 
+# Animated Progress Bars
+st.subheader("📊 Employee Gratuity Progress")
+for _, row in filtered.iterrows():
+    percent = min((row["Completed Years"] / 5) * 100, 100)
+    st.markdown(f"**{row['Emp ID']} - {row['Name']}**")
+    st.progress(percent / 100, text=f"{row['Completed Years']} years completed ({percent:.1f}%)")
+
 # Charts
 if not filtered.empty:
     st.subheader("📈 Gratuity Eligibility")
@@ -178,22 +189,25 @@ if not filtered.empty:
 else:
     st.info("Try adjusting filters to show data.")
 
-# Download Button
-st.download_button("⬇️ Download Filtered Report", data=filtered.to_csv(index=False), file_name="filtered_gratuity_report.csv", mime="text/csv")
+# 📥 Download
+if not filtered.empty:
+    st.download_button("⬇️ Download Filtered Report", data=filtered.to_csv(index=False), file_name="filtered_gratuity_report.csv", mime="text/csv")
 
-# Email Sending UI
+# 📧 Send Email UI
 st.subheader("📧 Send Gratuity Report via Email")
 email = st.text_input("Enter recipient email address")
-
 if st.button("Send Email Report"):
-    filtered.to_csv("filtered_report.csv", index=False)
-    result = send_email_easy(
-        to_email=email,
-        subject="Gratuity Tracker Report",
-        body="Attached is the Gratuity Eligibility Report.",
-        attachment_path="filtered_report.csv"
-    )
-    if result == True:
-        st.success("✅ Email sent successfully!")
+    if not filtered.empty:
+        filtered.to_csv("filtered_report.csv", index=False)
+        result = send_email_easy(
+            to_email=email,
+            subject="Gratuity Tracker Report",
+            body="Attached is the Gratuity Eligibility Report.",
+            attachment_path="filtered_report.csv"
+        )
+        if result == True:
+            st.success("✅ Email sent successfully!")
+        else:
+            st.error(result)
     else:
-        st.error(result)
+        st.warning("⚠️ No data to send. Adjust filters or upload data.")
