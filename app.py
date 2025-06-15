@@ -59,6 +59,25 @@ if not st.session_state["logged_in"]:
         else:
             st.error("❌ Invalid username or password")
     st.stop()
+from streamlit_lottie import st_lottie
+import requests
+
+def load_lottie_url(url):
+    try:
+        r = requests.get(url)
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except:
+        return None
+
+# Try this animated education Lottie
+lottie_employee = load_lottie_url("https://assets6.lottiefiles.com/packages/lf20_w51pcehl.json")
+
+if lottie_employee:
+    st_lottie(lottie_employee, height=250, key="emp_anim")
+else:
+    st.warning("⚠️ Animation not loaded. Check internet or URL.")
 
 # --- Header + Lottie ---
 st.title("🎉 Gratuity Tracker Dashboard")
