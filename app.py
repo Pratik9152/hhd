@@ -9,34 +9,30 @@ from streamlit_lottie import st_lottie
 # Page setup
 st.set_page_config(page_title="Gratuity Tracker", layout="wide")
 
-# 🎨 Animated Background CSS (Final Fix)
+# ✅ Background Image CSS (Stable & Compatible)
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] {
-        background: linear-gradient(-45deg, #ff9a9e, #fad0c4, #ffdde1, #a18cd1);
-        background-size: 400% 400%;
-        animation: gradient 15s ease infinite;
-    }
-    @keyframes gradient {
-        0% {background-position: 0% 50%;}
-        50% {background-position: 100% 50%;}
-        100% {background-position: 0% 50%;}
+        background-image: url('https://images.unsplash.com/photo-1557683304-673a23048d34?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80');
+        background-size: cover;
+        background-attachment: fixed;
+        background-position: center;
     }
     [data-testid="stHeader"] {
         background-color: rgba(255, 255, 255, 0);
     }
     [data-testid="stSidebar"] {
-        background: rgba(255, 255, 255, 0.7);
+        background-color: rgba(255, 255, 255, 0.7);
     }
     .main {
         background-color: rgba(255, 255, 255, 0.3);
         padding: 1rem;
-        border-radius: 1rem;
+        border-radius: 12px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 🌟 Load Lottie Animation
+# Lottie animation
 def load_lottie_url(url):
     try:
         r = requests.get(url)
@@ -67,22 +63,21 @@ if not st.session_state["logged_in"]:
             st.error("❌ Invalid username or password")
     st.stop()
 
-# 🏢 Header & Animation
+# Title + animation
 st.title("🎉 Gratuity Tracker Dashboard")
 if lottie_employee:
     st_lottie(lottie_employee, height=250, key="emp_lottie")
 else:
     st.warning("⚠️ Animation failed to load.")
 
-# 📂 Save Path
 save_path = "saved_data.xlsx"
 
-# 🔢 Year Calculation
+# 🔢 Calculate years
 def calculate_years(joining, exit=None):
     end = exit if pd.notna(exit) else datetime.today()
     return round((end - joining).days / 365, 2)
 
-# 🔁 Update Data
+# 🔁 Merge data
 def update_data(existing, new):
     new["Emp ID"] = new["Emp ID"].astype(str)
     existing["Emp ID"] = existing["Emp ID"].astype(str)
@@ -93,7 +88,7 @@ def update_data(existing, new):
     merged.reset_index(inplace=True)
     return merged
 
-# 📤 Upload
+# 📤 Upload file
 uploaded = st.file_uploader("📤 Upload Employee Excel", type=["xlsx"])
 if uploaded:
     new_df = pd.read_excel(uploaded, parse_dates=["Joining Date", "Exit Date"])
@@ -113,14 +108,14 @@ else:
     st.warning("⚠️ Please upload an Excel file.")
     st.stop()
 
-# 📊 Summary
+# 🔍 Summary
 st.markdown("### 📊 Overview")
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Employees", len(df))
 col2.metric("Gratuity Eligible", len(df[df["Gratuity Eligible"]]))
 col3.metric("Currently Working", len(df[df["Status"] == "Working"]))
 
-# 🔍 Filters
+# 🔎 Filter
 st.sidebar.header("🔍 Filter")
 depts = st.sidebar.multiselect("Department", df["Department"].unique(), default=df["Department"].unique())
 eligible_only = st.sidebar.checkbox("Only Gratuity Eligible", True)
@@ -154,5 +149,5 @@ if not filtered.empty:
 else:
     st.info("Try adjusting filters to show data.")
 
-# 📥 Download Button
+# 📥 Download
 st.download_button("⬇️ Download Filtered Report", data=filtered.to_csv(index=False), file_name="filtered_gratuity_report.csv", mime="text/csv")
