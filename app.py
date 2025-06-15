@@ -3,140 +3,143 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 import os
+import requests
+from streamlit_lottie import st_lottie
 
-# --- PAGE CONFIG ---
+# --- Page Config ---
 st.set_page_config(page_title="Gratuity Tracker", layout="wide")
 
-# --- ANIMATED BACKGROUND ---
+# --- Animated Background ---
 st.markdown("""
     <style>
     body {
-        background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
-        background-size: 400% 400%;
-        animation: gradientBG 15s ease infinite;
-        color: white;
+        background: linear-gradient(270deg, #ff9a9e, #fad0c4, #fad0c4, #ffdde1);
+        background-size: 800% 800%;
+        animation: gradient 30s ease infinite;
     }
-    @keyframes gradientBG {
+    @keyframes gradient {
         0% {background-position: 0% 50%;}
         50% {background-position: 100% 50%;}
         100% {background-position: 0% 50%;}
     }
-    .block-container {
-        padding: 2rem;
-    }
+    .stApp { font-family: 'Segoe UI', sans-serif; }
     .stButton>button, .stDownloadButton>button {
         background-color: #6a11cb;
         color: white;
-        font-weight: bold;
-        border-radius: 10px;
-        padding: 10px 20px;
-    }
-    .stTextInput>div>div>input {
-        background-color: #f0f0f0;
-        color: black;
+        border-radius: 8px;
+        padding: 0.5em 1em;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- LOGIN SYSTEM ---
-users = {"admin": "password123", "hr": "hr2024"}
+# --- Lottie Animation Loader ---
+def load_lottie_url(url):
+    r = requests.get(url)
+    if r.status_code != 200:
+        return None
+    return r.json()
 
+lottie_employee = load_lottie_url("https://assets7.lottiefiles.com/packages/lf20_puciaact.json")
+
+# --- Login ---
+users = {"admin": "password123", "hr": "hr2024"}
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
 if not st.session_state["logged_in"]:
     st.title("🔐 Login to Gratuity Tracker")
-
     with st.form("login_form"):
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
-        login_submit = st.form_submit_button("Login")
-
-    if login_submit:
+        login_btn = st.form_submit_button("Login")
+    if login_btn:
         if username in users and users[username] == password:
             st.session_state["logged_in"] = True
             st.rerun()
         else:
-            st.error("❌ Invalid credentials. Try again.")
+            st.error("❌ Invalid username or password")
     st.stop()
 
-# --- DASHBOARD START ---
+# --- Header + Lottie ---
 st.title("🎉 Gratuity Tracker Dashboard")
-st.markdown("Upload your Excel file. The app saves records by Emp ID and shows filters and charts.")
+st_lottie(lottie_employee, height=200, key="emp_anim")
 
 save_path = "saved_data.xlsx"
 
-def calculate_years(joining_date, exit_date=None):
-    today = datetime.today()
-    end_date = exit_date if pd.notna(exit_date) else today
-    return round((end_date - joining_date).days / 365, 2)
+def calculate_years(joining, exit=None):
+    end = exit if pd.notna(exit) else datetime.today()
+    return round((end - joining).days / 365, 2)
 
-def update_data(existing, new_data):
-    new_data["Emp ID"] = new_data["Emp ID"].astype(str)
+def update_data(existing, new):
+    new["Emp ID"] = new["Emp ID"].astype(str)
     existing["Emp ID"] = existing["Emp ID"].astype(str)
     existing = existing.set_index("Emp ID")
-    new_data = new_data.set_index("Emp ID")
-    existing.update(new_data)
-    merged = pd.concat([existing, new_data[~new_data.index.isin(existing.index)]])
+    new = new.set_index("Emp ID")
+    existing.update(new)
+    merged = pd.concat([existing, new[~new.index.isin(existing.index)]])
     merged.reset_index(inplace=True)
     return merged
 
-uploaded_file = st.file_uploader("📤 Upload Employee Excel", type=["xlsx"])
-
-if uploaded_file:
-    new_df = pd.read_excel(uploaded_file, parse_dates=["Joining Date", "Exit Date"])
+# --- File Upload ---
+uploaded = st.file_uploader("📤 Upload Employee Excel", type=["xlsx"])
+if uploaded:
+    new_df = pd.read_excel(uploaded, parse_dates=["Joining Date", "Exit Date"])
     new_df["Completed Years"] = new_df.apply(lambda row: calculate_years(row["Joining Date"], row["Exit Date"]), axis=1)
     new_df["Status"] = new_df["Exit Date"].apply(lambda x: "Exited" if pd.notna(x) and x < datetime.today() else "Working")
     new_df["Gratuity Eligible"] = new_df["Completed Years"] >= 5
-
     if os.path.exists(save_path):
         old_df = pd.read_excel(save_path, parse_dates=["Joining Date", "Exit Date"])
         df = update_data(old_df, new_df)
     else:
         df = new_df
-
     df.to_excel(save_path, index=False)
-    st.success("✅ Data uploaded and saved.")
+    st.success("✅ Data saved.")
 elif os.path.exists(save_path):
     df = pd.read_excel(save_path, parse_dates=["Joining Date", "Exit Date"])
 else:
-    st.warning("⚠️ No data available. Please upload an Excel file.")
+    st.warning("⚠️ Please upload an Excel file.")
     st.stop()
 
-# --- FILTER SIDEBAR ---
+# --- Summary Cards ---
+st.markdown("### 📊 Overview")
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Employees", len(df))
+col2.metric("Gratuity Eligible", len(df[df["Gratuity Eligible"]]))
+col3.metric("Currently Working", len(df[df["Status"] == "Working"]))
+
+# --- Filters ---
 st.sidebar.header("🔍 Filter")
-dept_options = st.sidebar.multiselect("Select Department", options=df["Department"].unique(), default=df["Department"].unique())
-eligible_only = st.sidebar.checkbox("Show Gratuity Eligible Only", value=True)
-start_date = st.sidebar.date_input("Joining Date From", value=datetime(2015, 1, 1))
-end_date = st.sidebar.date_input("Joining Date To", value=datetime.today())
+depts = st.sidebar.multiselect("Department", df["Department"].unique(), default=df["Department"].unique())
+eligible_only = st.sidebar.checkbox("Only Gratuity Eligible", True)
+start = st.sidebar.date_input("Joining From", datetime(2015, 1, 1))
+end = st.sidebar.date_input("Joining To", datetime.today())
 
-filtered_df = df[
-    (df["Department"].isin(dept_options)) &
-    (df["Joining Date"] >= pd.to_datetime(start_date)) &
-    (df["Joining Date"] <= pd.to_datetime(end_date))
+filtered = df[
+    (df["Department"].isin(depts)) &
+    (df["Joining Date"] >= pd.to_datetime(start)) &
+    (df["Joining Date"] <= pd.to_datetime(end))
 ]
-
 if eligible_only:
-    filtered_df = filtered_df[(filtered_df["Gratuity Eligible"]) | (filtered_df["Status"] == "Working")]
+    filtered = filtered[(filtered["Gratuity Eligible"]) | (filtered["Status"] == "Working")]
 
-# --- TABLE ---
+# --- Table ---
 st.subheader("📋 Filtered Employee Table")
-st.dataframe(filtered_df)
+st.dataframe(filtered)
 
-# --- CHARTS ---
-st.subheader("📈 Gratuity Eligibility Distribution")
-if not filtered_df.empty:
-    pie_data = filtered_df["Gratuity Eligible"].value_counts().rename(index={True: "Eligible", False: "Not Eligible"})
-    fig_pie = px.pie(names=pie_data.index, values=pie_data.values, title="Gratuity Eligibility")
-    st.plotly_chart(fig_pie, use_container_width=True)
+# --- Charts ---
+if not filtered.empty:
+    st.subheader("📈 Gratuity Eligibility")
+    pie_data = filtered["Gratuity Eligible"].value_counts().rename(index={True: "Eligible", False: "Not Eligible"})
+    pie_fig = px.pie(names=pie_data.index, values=pie_data.values, title="Eligibility Status")
+    st.plotly_chart(pie_fig, use_container_width=True)
 
-    st.subheader("🏢 Employees by Department")
-    dept_chart = filtered_df["Department"].value_counts().reset_index()
-    dept_chart.columns = ["Department", "Count"]
-    fig_bar = px.bar(dept_chart, x="Department", y="Count", color="Department", title="Employees by Department")
-    st.plotly_chart(fig_bar, use_container_width=True)
+    st.subheader("🏢 Department Distribution")
+    dept_data = filtered["Department"].value_counts().reset_index()
+    dept_data.columns = ["Department", "Count"]
+    dept_fig = px.bar(dept_data, x="Department", y="Count", color="Department", title="Employees by Department")
+    st.plotly_chart(dept_fig, use_container_width=True)
 else:
-    st.info("No data to show. Adjust your filters.")
+    st.info("Try adjusting filters to show data.")
 
-# --- DOWNLOAD ---
-st.download_button("⬇️ Download Filtered Report", data=filtered_df.to_csv(index=False), file_name="filtered_gratuity_report.csv", mime="text/csv")
+# --- Download Button ---
+st.download_button("⬇️ Download Filtered Report", data=filtered.to_csv(index=False), file_name="filtered_gratuity_report.csv", mime="text/csv")
