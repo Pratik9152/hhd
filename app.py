@@ -1,15 +1,19 @@
+# Gratuity Tracker with Email Sending - Final Streamlit App
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
 import os
 import requests
+import smtplib
+from email.message import EmailMessage
 from streamlit_lottie import st_lottie
 
 # Page setup
 st.set_page_config(page_title="Gratuity Tracker", layout="wide")
 
-# ✅ Background Image CSS (Stable & Compatible)
+# Background Styling
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] {
@@ -32,7 +36,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Lottie animation
+# Load Lottie animation
 def load_lottie_url(url):
     try:
         r = requests.get(url)
@@ -44,7 +48,7 @@ def load_lottie_url(url):
 
 lottie_employee = load_lottie_url("https://assets6.lottiefiles.com/packages/lf20_w51pcehl.json")
 
-# 🔐 Login
+# Simple Login System
 users = {"admin": "password123", "hr": "hr2024"}
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -72,12 +76,12 @@ else:
 
 save_path = "saved_data.xlsx"
 
-# 🔢 Calculate years
+# Calculate years function
 def calculate_years(joining, exit=None):
     end = exit if pd.notna(exit) else datetime.today()
     return round((end - joining).days / 365, 2)
 
-# 🔁 Merge data
+# Merge/Update data
 def update_data(existing, new):
     new["Emp ID"] = new["Emp ID"].astype(str)
     existing["Emp ID"] = existing["Emp ID"].astype(str)
@@ -88,7 +92,32 @@ def update_data(existing, new):
     merged.reset_index(inplace=True)
     return merged
 
-# 📤 Upload file
+# Send Email Function
+def send_email_easy(to_email, subject, body, attachment_path=None):
+    sender_email = "Pratiktekawade5555@gmail.com"  # Replace with your Gmail
+    app_password = "pratik9090"  # Replace with Gmail App Password
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = sender_email
+    msg["To"] = to_email
+    msg.set_content(body)
+
+    if attachment_path:
+        with open(attachment_path, "rb") as f:
+            file_data = f.read()
+            file_name = attachment_path.split("/")[-1]
+            msg.add_attachment(file_data, maintype="application", subtype="octet-stream", filename=file_name)
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(sender_email, app_password)
+            smtp.send_message(msg)
+        return True
+    except Exception as e:
+        return f"❌ Error: {e}"
+
+# Upload Excel
 uploaded = st.file_uploader("📤 Upload Employee Excel", type=["xlsx"])
 if uploaded:
     new_df = pd.read_excel(uploaded, parse_dates=["Joining Date", "Exit Date"])
@@ -108,14 +137,14 @@ else:
     st.warning("⚠️ Please upload an Excel file.")
     st.stop()
 
-# 🔍 Summary
+# Overview Metrics
 st.markdown("### 📊 Overview")
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Employees", len(df))
 col2.metric("Gratuity Eligible", len(df[df["Gratuity Eligible"]]))
 col3.metric("Currently Working", len(df[df["Status"] == "Working"]))
 
-# 🔎 Filter
+# Sidebar Filters
 st.sidebar.header("🔍 Filter")
 depts = st.sidebar.multiselect("Department", df["Department"].unique(), default=df["Department"].unique())
 eligible_only = st.sidebar.checkbox("Only Gratuity Eligible", True)
@@ -130,11 +159,11 @@ filtered = df[
 if eligible_only:
     filtered = filtered[(filtered["Gratuity Eligible"]) | (filtered["Status"] == "Working")]
 
-# 📋 Table
+# Display Table
 st.subheader("📋 Filtered Employee Table")
 st.dataframe(filtered)
 
-# 📈 Charts
+# Charts
 if not filtered.empty:
     st.subheader("📈 Gratuity Eligibility")
     pie_data = filtered["Gratuity Eligible"].value_counts().rename(index={True: "Eligible", False: "Not Eligible"})
@@ -149,5 +178,22 @@ if not filtered.empty:
 else:
     st.info("Try adjusting filters to show data.")
 
-# 📥 Download
+# Download Button
 st.download_button("⬇️ Download Filtered Report", data=filtered.to_csv(index=False), file_name="filtered_gratuity_report.csv", mime="text/csv")
+
+# Email Sending UI
+st.subheader("📧 Send Gratuity Report via Email")
+email = st.text_input("Enter recipient email address")
+
+if st.button("Send Email Report"):
+    filtered.to_csv("filtered_report.csv", index=False)
+    result = send_email_easy(
+        to_email=email,
+        subject="Gratuity Tracker Report",
+        body="Attached is the Gratuity Eligibility Report.",
+        attachment_path="filtered_report.csv"
+    )
+    if result == True:
+        st.success("✅ Email sent successfully!")
+    else:
+        st.error(result)
