@@ -1,4 +1,4 @@
-# Gratuity Tracker with Email Sending - Streamlit App (With Animated Dashboard + Secure Email)
+# Gratuity Tracker with Secure Email and Animated Dashboard
 
 import streamlit as st
 import pandas as pd
@@ -11,7 +11,7 @@ from email.message import EmailMessage
 from streamlit_lottie import st_lottie
 from dotenv import load_dotenv
 
-# Load environment variables for secure email
+# Load environment variables
 load_dotenv()
 
 # Page setup
@@ -189,13 +189,19 @@ if not filtered.empty:
 else:
     st.info("Try adjusting filters to show data.")
 
-# 📥 Download
+# 📥 Download filtered report if available
 if not filtered.empty:
-    st.download_button("⬇️ Download Filtered Report", data=filtered.to_csv(index=False), file_name="filtered_gratuity_report.csv", mime="text/csv")
+    st.download_button(
+        "⬇️ Download Filtered Report",
+        data=filtered.to_csv(index=False),
+        file_name="filtered_gratuity_report.csv",
+        mime="text/csv"
+    )
 
-# 📧 Send Email UI
+# 📧 Always show email section
 st.subheader("📧 Send Gratuity Report via Email")
 email = st.text_input("Enter recipient email address")
+
 if st.button("Send Email Report"):
     if not filtered.empty:
         filtered.to_csv("filtered_report.csv", index=False)
@@ -210,4 +216,4 @@ if st.button("Send Email Report"):
         else:
             st.error(result)
     else:
-        st.warning("⚠️ No data to send. Adjust filters or upload data.")
+        st.warning("⚠️ No data to send. Please upload or filter data.")
