@@ -7,7 +7,7 @@ import os
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Gratuity Tracker", layout="wide")
 
-# --- CSS Animated Background ---
+# --- ANIMATED BACKGROUND ---
 st.markdown("""
     <style>
     body {
@@ -40,26 +40,25 @@ st.markdown("""
 
 # --- LOGIN SYSTEM ---
 users = {"admin": "password123", "hr": "hr2024"}
+
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
 if not st.session_state["logged_in"]:
     st.title("🔐 Login to Gratuity Tracker")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    login_btn = st.button("Login")
-    if login_btn:
+
+    with st.form("login_form"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        login_submit = st.form_submit_button("Login")
+
+    if login_submit:
         if username in users and users[username] == password:
             st.session_state["logged_in"] = True
-            st.experimental_rerun()
+            st.rerun()
         else:
-            st.error("Invalid username or password")
+            st.error("❌ Invalid credentials. Try again.")
     st.stop()
-
-# ✅ FIX: Prevent crashing immediately after login
-if st.session_state["logged_in"] and "just_logged_in" not in st.session_state:
-    st.session_state["just_logged_in"] = True
-    st.experimental_rerun()
 
 # --- DASHBOARD START ---
 st.title("🎉 Gratuity Tracker Dashboard")
@@ -120,7 +119,7 @@ filtered_df = df[
 if eligible_only:
     filtered_df = filtered_df[(filtered_df["Gratuity Eligible"]) | (filtered_df["Status"] == "Working")]
 
-# --- TABLE DISPLAY ---
+# --- TABLE ---
 st.subheader("📋 Filtered Employee Table")
 st.dataframe(filtered_df)
 
@@ -139,7 +138,5 @@ if not filtered_df.empty:
 else:
     st.info("No data to show. Adjust your filters.")
 
-# --- DOWNLOAD BUTTON ---
+# --- DOWNLOAD ---
 st.download_button("⬇️ Download Filtered Report", data=filtered_df.to_csv(index=False), file_name="filtered_gratuity_report.csv", mime="text/csv")
-
-   
