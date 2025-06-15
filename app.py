@@ -1,78 +1,119 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import os
-import smtplib
 from datetime import datetime
-from email.message import EmailMessage
 from dotenv import load_dotenv
+import smtplib
+from email.message import EmailMessage
 
+# Load environment variables from .env file
 load_dotenv()
 
-st.set_page_config(page_title="Gratuity Tracker", layout="wide")
-st.title("🧮 Gratuity Tracker System")
+# 🌈 Page setup and animated gradient background
+st.set_page_config(page_title="🌌 Gratuity Tracker Dashboard", layout="wide")
+st.markdown("""
+    <style>
+    body {
+        background: linear-gradient(-45deg, #e3f2fd, #ffebee, #f3e5f5, #e8f5e9);
+        background-size: 400% 400%;
+        animation: gradientBG 15s ease infinite;
+    }
+    @keyframes gradientBG {
+        0% {background-position: 0% 50%;}
+        50% {background-position: 100% 50%;}
+        100% {background-position: 0% 50%;}
+    }
+    [data-testid="stSidebar"] {
+        background-color: #ffffffaa;
+    }
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-# Function to generate sample format
-def get_sample():
-    df = pd.DataFrame({
-        "Emp ID": ["E001", "E002"],
-        "Name": ["Alice", "Bob"],
-        "Department": ["HR", "Finance"],
-        "Joining Date": ["2016-01-10", "2018-05-23"],
+st.markdown("<h1 style='text-align:center; color:#4A148C;'>✨ Gratuity Tracker with Email & Analytics</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;'>Upload ➤ Track ➤ Visualize ➤ Send Report</p>", unsafe_allow_html=True)
+st.markdown("---")
+
+# Sidebar filter
+st.sidebar.title("🔍 Filters & Settings")
+min_years = st.sidebar.slider("Minimum Years for Eligibility", 0, 40, 5)
+
+# 📥 Sample Excel Format
+def sample_format():
+    return pd.DataFrame({
+        "Emp ID": ["E101", "E102"],
+        "Name": ["Arjun", "Meera"],
+        "Department": ["Finance", "HR"],
+        "Joining Date": ["2014-06-01", "2016-09-15"],
         "Exit Date": ["", ""]
     })
-    return df
 
-# 📥 Download Excel Format
-st.markdown("### 📥 Download Excel Format")
-sample_df = get_sample()
-st.download_button(
-    "Download Excel Format",
-    data=sample_df.to_csv(index=False),
-    file_name="gratuity_format.csv",
-    mime="text/csv"
-)
+st.subheader("📥 Download Excel Format")
+sample_df = sample_format()
+st.download_button("📂 Download Template", data=sample_df.to_csv(index=False), file_name="gratuity_template.csv", mime="text/csv")
 
-# 📤 Upload Filled Excel File
-uploaded = st.file_uploader("Upload Filled Excel File", type=["csv", "xlsx"])
-if uploaded:
-    if uploaded.name.endswith(".csv"):
-        df = pd.read_csv(uploaded)
-    else:
-        df = pd.read_excel(uploaded)
+# 📤 Upload Excel/CSV
+st.subheader("📤 Upload Employee Data")
+uploaded_file = st.file_uploader("Upload Excel or CSV file", type=["xlsx", "csv"])
 
+if uploaded_file:
+    df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith(".xlsx") else pd.read_csv(uploaded_file)
     df["Joining Date"] = pd.to_datetime(df["Joining Date"], errors="coerce")
     df["Exit Date"] = pd.to_datetime(df["Exit Date"], errors="coerce")
 
-    def completed_years(j, e=None):
-        end = e if pd.notna(e) else datetime.today()
-        return round((end - j).days / 365, 2)
+    def calc_years(join, exit=None):
+        end = exit if pd.notna(exit) else datetime.today()
+        return round((end - join).days / 365, 2)
 
-    df["Completed Years"] = df.apply(lambda x: completed_years(x["Joining Date"], x["Exit Date"]), axis=1)
-    df["Gratuity Eligible"] = df["Completed Years"] >= 5
+    df["Completed Years"] = df.apply(lambda row: calc_years(row["Joining Date"], row["Exit Date"]), axis=1)
+    df["Status"] = df["Exit Date"].apply(lambda x: "Exited" if pd.notna(x) else "Working")
+    df["Gratuity Eligible"] = df["Completed Years"] >= min_years
 
-    st.markdown("### 📋 Filtered Employees")
+    # 📊 Summary
+    st.subheader("📊 Summary Metrics")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("👥 Total Employees", len(df))
+    col2.metric("🏆 Eligible", df["Gratuity Eligible"].sum())
+    col3.metric("💼 Working", (df["Status"] == "Working").sum())
+
+    # 📋 Show Data
+    st.subheader("📋 Data Preview")
     st.dataframe(df)
 
-    # 📧 Send Email
-    st.markdown("### 📧 Send Report via Email")
-    to_email = st.text_input("Enter email to send report")
-    if st.button("Send Email"):
-        df.to_csv("report.csv", index=False)
+    # 📈 Charts
+    st.subheader("📈 Charts")
+    pie_chart = px.pie(df, names="Gratuity Eligible", title="Gratuity Eligibility")
+    st.plotly_chart(pie_chart, use_container_width=True)
 
+    bar_chart = px.bar(df["Department"].value_counts().reset_index(), x="index", y="Department",
+                       labels={"index": "Department", "Department": "Employees"},
+                       title="Department-wise Count")
+    st.plotly_chart(bar_chart, use_container_width=True)
+
+    # 📧 Email Section
+    st.subheader("📧 Send Report via Email")
+    recipient = st.text_input("Enter recipient's email address")
+    if st.button("Send Report"):
+        df.to_csv("filtered_report.csv", index=False)
         msg = EmailMessage()
-        msg["Subject"] = "Gratuity Report"
+        msg["Subject"] = "📩 Gratuity Tracker Report"
         msg["From"] = os.getenv("GMAIL_USER")
-        msg["To"] = to_email
-        msg.set_content("Please find attached the filtered gratuity report.")
-        with open("report.csv", "rb") as f:
-            msg.add_attachment(f.read(), maintype="application", subtype="csv", filename="report.csv")
+        msg["To"] = recipient
+        msg.set_content("Please find the attached gratuity report.")
+
+        with open("filtered_report.csv", "rb") as f:
+            msg.add_attachment(f.read(), maintype="application", subtype="octet-stream", filename="gratuity_report.csv")
 
         try:
             with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
                 smtp.login(os.getenv("GMAIL_USER"), os.getenv("GMAIL_PASS"))
                 smtp.send_message(msg)
-            st.success("✅ Email sent!")
+            st.success("✅ Report sent successfully!")
         except Exception as e:
-            st.error(f"❌ Failed: {e}")
+            st.error(f"❌ Email failed to send: {e}")
 else:
-    st.info("Please upload the file to continue.")
+    st.warning("📤 Please upload a file to continue.")
