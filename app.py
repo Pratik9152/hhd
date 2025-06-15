@@ -8,6 +8,8 @@ import io
 users = {"admin": "password123", "hr": "hr2024"}
 
 def login():
+    st.set_page_config(page_title="Gratuity Tracker", layout="wide")
+
     st.sidebar.title("🔐 Login")
     username = st.sidebar.text_input("Username")
     password = st.sidebar.text_input("Password", type="password")
