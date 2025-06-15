@@ -4,10 +4,10 @@ import plotly.express as px
 from datetime import datetime
 import os
 
-# Set Streamlit page config
+# --- PAGE CONFIG ---
 st.set_page_config(page_title="Gratuity Tracker", layout="wide")
 
-# Custom animated CSS background and styles
+# --- CSS Animated Background ---
 st.markdown("""
     <style>
     body {
@@ -22,23 +22,14 @@ st.markdown("""
         100% {background-position: 0% 50%;}
     }
     .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        padding-left: 2rem;
-        padding-right: 2rem;
+        padding: 2rem;
     }
-    .stButton>button {
+    .stButton>button, .stDownloadButton>button {
         background-color: #6a11cb;
         color: white;
         font-weight: bold;
         border-radius: 10px;
         padding: 10px 20px;
-    }
-    .stDownloadButton>button {
-        background-color: #11998e;
-        color: white;
-        font-weight: bold;
-        border-radius: 10px;
     }
     .stTextInput>div>div>input {
         background-color: #f0f0f0;
@@ -47,9 +38,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Login System ---
+# --- LOGIN SYSTEM ---
 users = {"admin": "password123", "hr": "hr2024"}
-
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
@@ -66,9 +56,14 @@ if not st.session_state["logged_in"]:
             st.error("Invalid username or password")
     st.stop()
 
-# --- Dashboard Start ---
+# ✅ FIX: Prevent crashing immediately after login
+if st.session_state["logged_in"] and "just_logged_in" not in st.session_state:
+    st.session_state["just_logged_in"] = True
+    st.experimental_rerun()
+
+# --- DASHBOARD START ---
 st.title("🎉 Gratuity Tracker Dashboard")
-st.markdown("Upload your Excel file to update employee data. The system will store history and update records smartly.")
+st.markdown("Upload your Excel file. The app saves records by Emp ID and shows filters and charts.")
 
 save_path = "saved_data.xlsx"
 
@@ -103,14 +98,13 @@ if uploaded_file:
 
     df.to_excel(save_path, index=False)
     st.success("✅ Data uploaded and saved.")
+elif os.path.exists(save_path):
+    df = pd.read_excel(save_path, parse_dates=["Joining Date", "Exit Date"])
 else:
-    if os.path.exists(save_path):
-        df = pd.read_excel(save_path, parse_dates=["Joining Date", "Exit Date"])
-    else:
-        st.warning("Please upload an Excel file.")
-        st.stop()
+    st.warning("⚠️ No data available. Please upload an Excel file.")
+    st.stop()
 
-# --- Filter Sidebar ---
+# --- FILTER SIDEBAR ---
 st.sidebar.header("🔍 Filter")
 dept_options = st.sidebar.multiselect("Select Department", options=df["Department"].unique(), default=df["Department"].unique())
 eligible_only = st.sidebar.checkbox("Show Gratuity Eligible Only", value=True)
@@ -126,23 +120,26 @@ filtered_df = df[
 if eligible_only:
     filtered_df = filtered_df[(filtered_df["Gratuity Eligible"]) | (filtered_df["Status"] == "Working")]
 
-# --- Display Table ---
+# --- TABLE DISPLAY ---
 st.subheader("📋 Filtered Employee Table")
 st.dataframe(filtered_df)
 
-# --- Charts ---
-st.subheader("📈 Eligibility Overview")
-pie_data = filtered_df["Gratuity Eligible"].value_counts().rename(index={True: "Eligible", False: "Not Eligible"})
-fig_pie = px.pie(names=pie_data.index, values=pie_data.values, title="Gratuity Eligibility")
-st.plotly_chart(fig_pie, use_container_width=True)
+# --- CHARTS ---
+st.subheader("📈 Gratuity Eligibility Distribution")
+if not filtered_df.empty:
+    pie_data = filtered_df["Gratuity Eligible"].value_counts().rename(index={True: "Eligible", False: "Not Eligible"})
+    fig_pie = px.pie(names=pie_data.index, values=pie_data.values, title="Gratuity Eligibility")
+    st.plotly_chart(fig_pie, use_container_width=True)
 
-st.subheader("🏢 Employees by Department")
-dept_chart = filtered_df["Department"].value_counts().reset_index()
-dept_chart.columns = ["Department", "Count"]
-fig_bar = px.bar(dept_chart, x="Department", y="Count", color="Department", title="Employees by Department")
-st.plotly_chart(fig_bar, use_container_width=True)
+    st.subheader("🏢 Employees by Department")
+    dept_chart = filtered_df["Department"].value_counts().reset_index()
+    dept_chart.columns = ["Department", "Count"]
+    fig_bar = px.bar(dept_chart, x="Department", y="Count", color="Department", title="Employees by Department")
+    st.plotly_chart(fig_bar, use_container_width=True)
+else:
+    st.info("No data to show. Adjust your filters.")
 
-# --- Download Button ---
+# --- DOWNLOAD BUTTON ---
 st.download_button("⬇️ Download Filtered Report", data=filtered_df.to_csv(index=False), file_name="filtered_gratuity_report.csv", mime="text/csv")
 
    
